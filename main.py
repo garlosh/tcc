@@ -11,6 +11,7 @@ from sklearn.metrics import classification_report, accuracy_score
 from sklearn.semi_supervised import LabelPropagation
 from nltk.corpus import stopwords
 from xgboost import XGBClassifier
+import mcls
 
 # Baixar stopwords se necessário
 nltk.download('stopwords', quiet=True)
@@ -174,7 +175,8 @@ def main():
 
     # Divisão treino/teste
     X_train, X_test, y_train, y_test = dividir_treino_teste(X, y)
-
+    pdb.set_trace()
+    
     # Proporções de remoção de rótulos
     proporcoes = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]
 

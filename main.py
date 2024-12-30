@@ -31,14 +31,15 @@ def limpar_texto(texto: str) -> str:
     texto = ''.join([char for char in texto if char not in string.punctuation])
     texto = texto.lower()
     stop_words = set(stopwords.words('portuguese'))
-    texto = ' '.join([word for word in texto.split() if word not in stop_words])
+    texto = ' '.join([word for word in texto.split()
+                     if word not in stop_words])
     return texto
 
 
 def preparar_features(df: pd.DataFrame, coluna_texto: str, coluna_label: str):
     """Prepara as features (X) e labels (y) usando TF-IDF."""
-    tfidf = TfidfVectorizer()
-    X = tfidf.fit_transform(df[coluna_texto])
+    tfidf = TfidfVectorizer(stop_words=stopwords.words('portuguese'))
+    X = tfidf.fit_transform(df[coluna_texto],)
     y = df[coluna_label]
     return X, y, tfidf
 
@@ -54,12 +55,13 @@ def remover_proporcao_rotulos(y_train, proporcao: float, random_state: int = 42)
     y_train_mod = y_train.copy()
     n_remover = int(proporcao * len(y_train_mod))
     np.random.seed(random_state)
-    indices_remover = np.random.choice(y_train_mod.index, n_remover, replace=False)
+    indices_remover = np.random.choice(
+        y_train_mod.index, n_remover, replace=False)
     y_train_mod.loc[indices_remover] = -1
     return y_train_mod
 
 
-def remover_um_rotulo(y_train, random_state: int = 42, rotulo: int = 1, prop:float = 1):
+def remover_um_rotulo(y_train, random_state: int = 42, rotulo: int = 1, prop: float = 1):
     """Remove exatamente uma classe de rótulo do conjunto de treinamento."""
     y_train_mod = y_train.copy()
     np.random.seed(random_state)
@@ -93,7 +95,7 @@ class ExperimentoLabelPropagation:
     def executar_experimento_proporcoes(self, proporcoes: List[float]) -> pd.DataFrame:
         """Executa o experimento com várias proporções de remoção de rótulos."""
         resultados = []
-        
+
         for prop in proporcoes:
             df_res = self.executar_experimento_remocao(proporcao=prop)
             resultados.append(df_res)
@@ -107,10 +109,11 @@ class ExperimentoLabelPropagation:
         """Executa o experimento para um caso de remoção de rótulos (por proporção ou um único rótulo)."""
         if um_rotulo:
             y_train_mod = remover_um_rotulo(self.y_train)
-            #pdb.set_trace()
+            # pdb.set_trace()
             prop_info = '1_label'
         else:
-            y_train_mod = remover_proporcao_rotulos(self.y_train, proporcao=proporcao)
+            y_train_mod = remover_proporcao_rotulos(
+                self.y_train, proporcao=proporcao)
             prop_info = proporcao
 
         # LabelPropagation
@@ -120,9 +123,12 @@ class ExperimentoLabelPropagation:
 
         # Modelos com LabelPropagation
         lr_lp = LogisticRegression(max_iter=1000, random_state=42)
-        xgb_lp = XGBClassifier(eval_metric='logloss', use_label_encoder=False, random_state=42)
-        lr_lp_res = treinar_e_avaliar_modelo(lr_lp, self.X_train, y_train_propagado, self.X_test, self.y_test)
-        xgb_lp_res = treinar_e_avaliar_modelo(xgb_lp, self.X_train, y_train_propagado, self.X_test, self.y_test)
+        xgb_lp = XGBClassifier(eval_metric='logloss',
+                               use_label_encoder=False, random_state=42)
+        lr_lp_res = treinar_e_avaliar_modelo(
+            lr_lp, self.X_train, y_train_propagado, self.X_test, self.y_test)
+        xgb_lp_res = treinar_e_avaliar_modelo(
+            xgb_lp, self.X_train, y_train_propagado, self.X_test, self.y_test)
 
         # Cenário sem LabelPropagation (descartar não rotulados)
         mask_labeled = (y_train_mod != -1)
@@ -130,9 +136,12 @@ class ExperimentoLabelPropagation:
         y_train_no_lp = y_train_mod[mask_labeled]
 
         lr_no_lp = LogisticRegression(max_iter=1000, random_state=42)
-        xgb_no_lp = XGBClassifier(eval_metric='logloss', use_label_encoder=False, random_state=42)
-        lr_no_lp_res = treinar_e_avaliar_modelo(lr_no_lp, X_train_no_lp, y_train_no_lp, self.X_test, self.y_test)
-        xgb_no_lp_res = treinar_e_avaliar_modelo(xgb_no_lp, X_train_no_lp, y_train_no_lp, self.X_test, self.y_test)
+        xgb_no_lp = XGBClassifier(
+            eval_metric='logloss', use_label_encoder=False, random_state=42)
+        lr_no_lp_res = treinar_e_avaliar_modelo(
+            lr_no_lp, X_train_no_lp, y_train_no_lp, self.X_test, self.y_test)
+        xgb_no_lp_res = treinar_e_avaliar_modelo(
+            xgb_no_lp, X_train_no_lp, y_train_no_lp, self.X_test, self.y_test)
 
         resultado = {
             'proporcao_remocao': prop_info,
@@ -168,7 +177,8 @@ def main():
     # Carregar dados
     df = carregar_dados(caminho_dados)
     # Limpar texto
-    df['manchete_limpa'] = df['preprocessed_news'].apply(lambda txt: limpar_texto(txt))
+    df['manchete_limpa'] = df['preprocessed_news'].apply(
+        lambda txt: limpar_texto(txt))
 
     # Preparar features
     X, y, _ = preparar_features(df, 'manchete_limpa', 'label')
@@ -176,20 +186,22 @@ def main():
     # Divisão treino/teste
     X_train, X_test, y_train, y_test = dividir_treino_teste(X, y)
     pdb.set_trace()
-    
+
     # Proporções de remoção de rótulos
     proporcoes = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]
 
     # Executar experimento
     experimento = ExperimentoLabelPropagation(X_train, y_train, X_test, y_test)
-    df_resultados_prop = experimento.executar_experimento_proporcoes(proporcoes)
+    df_resultados_prop = experimento.executar_experimento_proporcoes(
+        proporcoes)
 
     # Executar experimento removendo apenas um rótulo
-    
+
     df_resultado_um = experimento.executar_experimento_um_rotulo()
 
     # Concatenar resultados
-    df_resultados = pd.concat([df_resultados_prop, df_resultado_um], ignore_index=True)
+    df_resultados = pd.concat(
+        [df_resultados_prop, df_resultado_um], ignore_index=True)
 
     # Salvar resultados
     df_resultados.to_csv('comparacao_labelpropagation_vs_sem.csv', index=False)

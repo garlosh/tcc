@@ -1,3 +1,4 @@
+from sklearn.cluster import KMeans
 import pandas as pd
 import numpy as np
 import nltk
@@ -8,13 +9,59 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score
-from sklearn.semi_supervised import LabelPropagation
 from nltk.corpus import stopwords
 from xgboost import XGBClassifier
-import mcls
 
 # Baixar stopwords se necessário
 nltk.download('stopwords', quiet=True)
+
+
+def initialize_labels_with_kmeans(X_labeled, X_unlabeled, k, r):
+    """
+    Inicializa os rótulos dos dados não rotulados usando k-means, conforme descrito.
+
+    Parâmetros
+    ----------
+    X_labeled : csr_matrix ou np.array de shape (n_labeled, n_features)
+        Dados com rótulos conhecidos (treinamento rotulado).
+    y_labeled : np.array de shape (n_labeled,)
+        Rótulos conhecidos (0/1 ou -1/+1).
+    X_unlabeled : csr_matrix ou np.array de shape (n_unlabeled, n_features)
+        Dados não rotulados.
+    k : int
+        Número de clusters para o k-means.
+    r : float ou int
+        Parâmetro que controla quantos exemplos negativos serão selecionados
+        dos clusters definidos como negativos:
+          - Se for float (ex.: 0.2), seleciona essa fração do total de exemplos não rotulados de cada cluster negativo.
+          - Se for int (ex.: 10), seleciona esse número fixo de exemplos de cada cluster negativo.
+
+    Retorna
+    -------
+    y_unlabeled_pred : np.array de shape (n_unlabeled,)
+        Rótulos previstos para os dados não rotulados, após o processo de
+        definição via k-means.
+    """
+
+    X_labeled_arr = X_labeled.toarray() if hasattr(
+        X_labeled, 'toarray') else X_labeled
+    X_unlabeled_arr = X_unlabeled.toarray() if hasattr(
+        X_unlabeled, 'toarray') else X_unlabeled
+    X_all = np.vstack((X_labeled_arr, X_unlabeled_arr))
+
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(X_all)
+
+    cluster_labels_all = kmeans.labels_
+
+    centroid = np.mean(X_all[cluster_labels_all == 1], axis=0)
+    distances = np.linalg.norm(X_all - centroid, axis=1)
+    n_distant = int(np.ceil(r * len(X_all)))
+    indices_sorted_desc = np.argsort(distances)[::-1]
+    indices_top = indices_sorted_desc[:n_distant]
+    y_weak_labeled = np.full(len(X_all), -1)
+    y_weak_labeled[indices_top] = 0
+    return y_weak_labeled
 
 
 def carregar_dados(caminho: str) -> pd.DataFrame:
@@ -42,11 +89,6 @@ def preparar_features(df: pd.DataFrame, coluna_texto: str, coluna_label: str):
     X = tfidf.fit_transform(df[coluna_texto],)
     y = df[coluna_label]
     return X, y, tfidf
-
-
-def dividir_treino_teste(X, y, test_size: float = 0.2, random_state: int = 42):
-    """Divide os dados em treino e teste."""
-    return train_test_split(X, y, test_size=test_size, random_state=random_state)
 
 
 def remover_proporcao_rotulos(y_train, proporcao: float, random_state: int = 42):
@@ -117,9 +159,8 @@ class ExperimentoLabelPropagation:
             prop_info = proporcao
 
         # LabelPropagation
-        lp = LabelPropagation()
-        lp.fit(self.X_train, y_train_mod)
-        y_train_propagado = lp.transduction_
+        y_train_propagado = initialize_labels_with_kmeans(
+            self.X_train[y_train_mod != -1], self.X_train[y_train_mod == -1], k=2, r=.75)
 
         # Modelos com LabelPropagation
         lr_lp = LogisticRegression(max_iter=1000, random_state=42)
@@ -184,8 +225,8 @@ def main():
     X, y, _ = preparar_features(df, 'manchete_limpa', 'label')
 
     # Divisão treino/teste
-    X_train, X_test, y_train, y_test = dividir_treino_teste(X, y)
-    pdb.set_trace()
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42)
 
     # Proporções de remoção de rótulos
     proporcoes = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]

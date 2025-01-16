@@ -10,9 +10,11 @@ from sklearn.metrics import classification_report, accuracy_score
 from xgboost import XGBClassifier
 from dotenv import load_dotenv
 import os
+from time import gmtime, strftime
+import hashlib
 load_dotenv(override=True)
 nltk.download('stopwords', quiet=True)
-openai.api_key = openai.api_key = os.getenv("OPENAI_API_KEY")
+# openai.api_key = openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 def remover_um_rotulo(y_train: pd.Series, rotulo=1, prop=1.0, random_state=42):
@@ -54,7 +56,6 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
       - Cenário com LP (treina LR, XGB + ChatGPT zero/few-shot)
     Retorna um dicionário com as métricas.
     """
-
     # 1) Remover rótulos
     y_mod = datahandler.remover_proporcao_rotulos(y_train_ser, proporcao)
     prop_info = proporcao
@@ -76,14 +77,16 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
         xgb_no_lp, X_no_lp, y_no_lp, X_test, y_test)
 
     # ChatGPT (Zero-Shot e Few-Shot)
-    chatgpt_zero_no_lp = gpt.avaliar_chatgpt(text_test, y_test)  # zero-shot
+
+    chatgpt_zero_no_lp = gpt.avaliar_chatgpt(
+        text_no_lp, y_no_lp)  # zero-shot
     exemplos_fs_no_lp = gpt.build_few_shot_examples(text_no_lp, y_no_lp)
     chatgpt_few_no_lp = gpt.avaliar_chatgpt(
-        text_test, y_test, exemplos_rotulados=exemplos_fs_no_lp)
+        text_no_lp, y_no_lp, exemplos_fs_no_lp)
 
     # 3) COM Label Propagation (via KMeans)
     y_propagado = mcls.initialize_labels_with_kmeans(
-        X_no_lp, X_train[~mask_no_lp], y_mod, k=2, r=0.75
+        X_no_lp, X_train[~mask_no_lp], y_mod, k=2, r=0.15
     )
     mask_lp = (y_propagado != -1)
     X_lp = X_train[mask_lp]
@@ -98,10 +101,11 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
     xgb_lp_res = treinar_e_avaliar_modelo(xgb_lp, X_lp, y_lp, X_test, y_test)
 
     # ChatGPT (Zero-Shot e Few-Shot)
-    chatgpt_zero_lp = gpt.avaliar_chatgpt(text_test, y_test)  # zero-shot
+    chatgpt_zero_lp = gpt.avaliar_chatgpt(
+        text_lp, y_lp)  # zero-shot
     exemplos_fs_lp = gpt.build_few_shot_examples(text_lp, y_lp)
     chatgpt_few_lp = gpt.avaliar_chatgpt(
-        text_test, y_test, exemplos_rotulados=exemplos_fs_lp)
+        text_lp, y_lp, exemplos_fs_lp)
 
     # 4) Monta dicionário final
     return {
@@ -147,13 +151,14 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
         'acc_chatgpt_few_lp': chatgpt_few_lp['accuracy'],
         'prec_chatgpt_few_lp': chatgpt_few_lp['precision'],
         'rec_chatgpt_few_lp': chatgpt_few_lp['recall'],
-        'f1_chatgpt_few_lp': chatgpt_few_lp['f1'],
+        'f1_chatgpt_few_lp': chatgpt_few_lp['f1']
     }
 
 
 def main():
     # Carregamento e pré-processamento
     caminho_dados = './dados/pre-processed.csv'
+    caminho_arquivo = 'resultados_tcc.csv'
     df = datahandler.carregar_dados(caminho_dados)
     df['manchete_limpa'] = df['preprocessed_news'].apply(
         datahandler.limpar_texto)
@@ -172,8 +177,7 @@ def main():
     y_train_ser = pd.Series(y_train)
 
     # Lista de proporções
-    proporcoes = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5,
-                  0.6, 0.7, 0.8, 0.9]  # por exemplo
+    proporcoes = [0.9]  # por exemplo
 
     # Executa experimentos
     resultados = []
@@ -184,12 +188,10 @@ def main():
             proporcao=prop
         )
         resultados.append(res_dict)
-
-    # Salva resultados
-    df_resultados = pd.DataFrame(resultados)
-    df_resultados.to_csv(
-        'comparacao_labelpropagation_chatgpt_simplificado.csv', index=False)
-    print("Resultados salvos em 'comparacao_labelpropagation_chatgpt_simplificado.csv'.")
+        df_resultados = pd.DataFrame(resultados)
+        df_resultados.to_csv(caminho_arquivo, index=False)
+        print(f"""Resultados intermediarios com proporção {
+              prop} salvos em 'comparacao_labelpropagation_chatgpt_simplificado.csv'.""")
 
 
 if __name__ == '__main__':

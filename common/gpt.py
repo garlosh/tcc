@@ -30,7 +30,7 @@ def build_few_shot_examples(text_train: List[str],
 
 
 def prever_com_chatgpt(texto: str, exemplos_rotulados: List[Dict[str, str]] = None,
-                       url_ollama: str = "http://localhost:11434/api/generate", modelo_ollama: str = "qwen:4b") -> str:
+                       url_ollama: str = "http://localhost:11434/api/generate", modelo_ollama: str = "qwen2.5:14b") -> str:
     """
     Faz uma previsão usando ChatGPT:
       - Se exemplos_rotulados for None -> Zero-Shot

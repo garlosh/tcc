@@ -80,9 +80,9 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
 
     chatgpt_zero_no_lp = gpt.avaliar_chatgpt(
         text_no_lp, y_no_lp)  # zero-shot
-    exemplos_fs_no_lp = gpt.build_few_shot_examples(text_no_lp, y_no_lp)
-    chatgpt_few_no_lp = gpt.avaliar_chatgpt(
-        text_no_lp, y_no_lp, exemplos_fs_no_lp)
+    #exemplos_fs_no_lp = gpt.build_few_shot_examples(text_no_lp, y_no_lp)
+    #chatgpt_few_no_lp = gpt.avaliar_chatgpt(
+    #    text_no_lp, y_no_lp, exemplos_fs_no_lp)
 
     # 3) COM Label Propagation (via KMeans)
     y_propagado = mcls.initialize_labels_with_kmeans(
@@ -103,9 +103,9 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
     # ChatGPT (Zero-Shot e Few-Shot)
     chatgpt_zero_lp = gpt.avaliar_chatgpt(
         text_lp, y_lp)  # zero-shot
-    exemplos_fs_lp = gpt.build_few_shot_examples(text_lp, y_lp)
-    chatgpt_few_lp = gpt.avaliar_chatgpt(
-        text_lp, y_lp, exemplos_fs_lp)
+    #exemplos_fs_lp = gpt.build_few_shot_examples(text_lp, y_lp)
+    #chatgpt_few_lp = gpt.avaliar_chatgpt(
+    #    text_lp, y_lp, exemplos_fs_lp)
 
     # 4) Monta dicionário final
     return {
@@ -127,11 +127,6 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
         'rec_chatgpt_zero_no_lp': chatgpt_zero_no_lp['recall'],
         'f1_chatgpt_zero_no_lp': chatgpt_zero_no_lp['f1'],
 
-        'acc_chatgpt_few_no_lp': chatgpt_few_no_lp['accuracy'],
-        'prec_chatgpt_few_no_lp': chatgpt_few_no_lp['precision'],
-        'rec_chatgpt_few_no_lp': chatgpt_few_no_lp['recall'],
-        'f1_chatgpt_few_no_lp': chatgpt_few_no_lp['f1'],
-
         # COM LP (LR, XGB, ChatGPT Zero, ChatGPT Few)
         'acc_log_lp': lr_lp_res['accuracy'],
         'precision_log_lp': lr_lp_res['precision'],
@@ -146,12 +141,7 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
         'acc_chatgpt_zero_lp': chatgpt_zero_lp['accuracy'],
         'prec_chatgpt_zero_lp': chatgpt_zero_lp['precision'],
         'rec_chatgpt_zero_lp': chatgpt_zero_lp['recall'],
-        'f1_chatgpt_zero_lp': chatgpt_zero_lp['f1'],
-
-        'acc_chatgpt_few_lp': chatgpt_few_lp['accuracy'],
-        'prec_chatgpt_few_lp': chatgpt_few_lp['precision'],
-        'rec_chatgpt_few_lp': chatgpt_few_lp['recall'],
-        'f1_chatgpt_few_lp': chatgpt_few_lp['f1']
+        'f1_chatgpt_zero_lp': chatgpt_zero_lp['f1']
     }
 
 
@@ -177,7 +167,7 @@ def main():
     y_train_ser = pd.Series(y_train)
 
     # Lista de proporções
-    proporcoes = [0.9]  # por exemplo
+    proporcoes = [0.0, 0.25, 0.50, 0.75, 0.85]  # por exemplo
 
     # Executa experimentos
     resultados = []

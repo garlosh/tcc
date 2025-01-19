@@ -30,7 +30,7 @@ def build_few_shot_examples(text_train: List[str],
 
 
 def prever_com_chatgpt(texto: str, exemplos_rotulados: List[Dict[str, str]] = None,
-                       url_ollama: str = "http://localhost:11434/api/generate", modelo_ollama: str = "qwen2.5:14b") -> str:
+                       url_ollama: str = "http://localhost:11434/api/generate", modelo_ollama: str = "qwen2.5:7b") -> str:
     """
     Faz uma previsão usando ChatGPT:
       - Se exemplos_rotulados for None -> Zero-Shot
@@ -70,7 +70,8 @@ def prever_com_chatgpt(texto: str, exemplos_rotulados: List[Dict[str, str]] = No
             json={
                 "prompt": prompt,
                 "model": modelo_ollama,
-                "stream": False
+                "stream": False,
+		"options": {"num_ctx":8192}
             },
             timeout=60
         )
@@ -163,9 +164,12 @@ def avaliar_chatgpt(textos: List[str], y_true: np.ndarray, exemplos_rotulados: L
     Avalia ChatGPT em zero-shot (exemplos_rotulados=None) ou few-shot (exemplos_rotulados != None).
     """
     y_pred = []
+    cont = 0
     for txt in textos:
         pred = prever_com_chatgpt(txt, exemplos_rotulados)
         y_pred.append(1 if pred == 'fake' else 0)
+        cont += 1
+        print(f"iteracao {cont}/{len(textos)}")
 
     acc = accuracy_score(y_true, y_pred)
     report = classification_report(y_true, y_pred, output_dict=True)

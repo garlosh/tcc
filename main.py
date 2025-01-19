@@ -42,10 +42,6 @@ def treinar_e_avaliar_modelo(modelo, X_train, y_train, X_test, y_test) -> Dict[s
         'f1': rep['weighted avg']['f1-score']
     }
 
-##############################################################################
-#                           FUNÇÃO PRINCIPAL DO FLOW                         #
-##############################################################################
-
 
 def executar_experimento(X_train, y_train_ser, X_test, y_test,
                          text_train, text_test,
@@ -80,8 +76,8 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
 
     chatgpt_zero_no_lp = gpt.avaliar_chatgpt(
         text_no_lp, y_no_lp)  # zero-shot
-    #exemplos_fs_no_lp = gpt.build_few_shot_examples(text_no_lp, y_no_lp)
-    #chatgpt_few_no_lp = gpt.avaliar_chatgpt(
+    # exemplos_fs_no_lp = gpt.build_few_shot_examples(text_no_lp, y_no_lp)
+    # chatgpt_few_no_lp = gpt.avaliar_chatgpt(
     #    text_no_lp, y_no_lp, exemplos_fs_no_lp)
 
     # 3) COM Label Propagation (via KMeans)
@@ -103,8 +99,8 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
     # ChatGPT (Zero-Shot e Few-Shot)
     chatgpt_zero_lp = gpt.avaliar_chatgpt(
         text_lp, y_lp)  # zero-shot
-    #exemplos_fs_lp = gpt.build_few_shot_examples(text_lp, y_lp)
-    #chatgpt_few_lp = gpt.avaliar_chatgpt(
+    # exemplos_fs_lp = gpt.build_few_shot_examples(text_lp, y_lp)
+    # chatgpt_few_lp = gpt.avaliar_chatgpt(
     #    text_lp, y_lp, exemplos_fs_lp)
 
     # 4) Monta dicionário final
@@ -170,18 +166,32 @@ def main():
     proporcoes = [0.0, 0.25, 0.50, 0.75, 0.85]  # por exemplo
 
     # Executa experimentos
+
+    # Inicializa a lista de resultados
     resultados = []
+
+    # Itera pelas proporções
     for prop in proporcoes:
+        # Executa o experimento
         res_dict = executar_experimento(
             X_train, y_train_ser, X_test, y_test,
             text_train, text_test,
             proporcao=prop
         )
+
         resultados.append(res_dict)
         df_resultados = pd.DataFrame(resultados)
-        df_resultados.to_csv(caminho_arquivo, index=False)
-        print(f"""Resultados intermediarios com proporção {
-              prop} salvos em 'comparacao_labelpropagation_chatgpt_simplificado.csv'.""")
+        file_exists = os.path.isfile(caminho_arquivo)
+        df_resultados.to_csv(
+            caminho_arquivo,
+            mode='a',
+            index=False,
+            header=not file_exists  # Adiciona o cabeçalho somente se o arquivo não existir
+        )
+        resultados.clear()
+        # Log para indicar que os resultados foram salvos
+        print(f"Resultados intermediários com proporção {
+              prop} salvos em '{caminho_arquivo}'.")
 
 
 if __name__ == '__main__':

@@ -163,7 +163,7 @@ def main():
     y_train_ser = pd.Series(y_train)
 
     # Lista de proporções
-    proporcoes = [0.0, 0.25, 0.50, 0.75, 0.85]  # por exemplo
+    proporcoes = [0.25, 0.50, 0.75, 0.85]  # por exemplo
 
     # Executa experimentos
 

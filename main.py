@@ -145,6 +145,7 @@ def main():
     # Carregamento e pré-processamento
     caminho_dados = './dados/pre-processed.csv'
     caminho_arquivo = 'resultados_tcc.csv'
+    df['manchete_ia'] = df['preprocessed_news']
     df = datahandler.carregar_dados(caminho_dados)
     df['manchete_limpa'] = df['preprocessed_news'].apply(
         datahandler.limpar_texto)
@@ -152,7 +153,7 @@ def main():
     # Gera embeddings
     X, y, _ = datahandler.preparar_features_word2vec(df, 'manchete_limpa', 'label',
                                                      vector_size=100, window=5, min_count=1)
-    textos = df['manchete_limpa'].values
+    textos = df['manchete_ia'].values
 
     # Divide treino/teste
     X_train, X_test, y_train, y_test, text_train, text_test = train_test_split(
@@ -163,7 +164,7 @@ def main():
     y_train_ser = pd.Series(y_train)
 
     # Lista de proporções
-    proporcoes = [0.25, 0.50, 0.75, 0.85]  # por exemplo
+    proporcoes = [0.0, 0.25, 0.50, 0.75, 0.85]  # por exemplo
 
     # Executa experimentos
 

@@ -137,8 +137,8 @@ def main():
     # Carregamento e pré-processamento
     caminho_dados = './dados/pre-processed.csv'
     caminho_arquivo = 'resultados_tcc.csv'
-    df['manchete_ia'] = df['preprocessed_news']
     df = datahandler.carregar_dados(caminho_dados)
+    df['manchete_ia'] = df['preprocessed_news']
     df['manchete_limpa'] = df['preprocessed_news'].apply(
         datahandler.limpar_texto)
 

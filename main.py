@@ -96,9 +96,6 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
     lr_lp_res = treinar_e_avaliar_modelo(lr_lp, X_lp, y_lp, X_test, y_test)
     xgb_lp_res = treinar_e_avaliar_modelo(xgb_lp, X_lp, y_lp, X_test, y_test)
 
-    # ChatGPT (Zero-Shot e Few-Shot)
-    chatgpt_zero_lp = gpt.avaliar_chatgpt(
-        text_lp, y_lp)  # zero-shot
     # exemplos_fs_lp = gpt.build_few_shot_examples(text_lp, y_lp)
     # chatgpt_few_lp = gpt.avaliar_chatgpt(
     #    text_lp, y_lp, exemplos_fs_lp)
@@ -133,11 +130,6 @@ def executar_experimento(X_train, y_train_ser, X_test, y_test,
         'precision_xgb_lp': xgb_lp_res['precision'],
         'recall_xgb_lp': xgb_lp_res['recall'],
         'f1_xgb_lp': xgb_lp_res['f1'],
-
-        'acc_chatgpt_zero_lp': chatgpt_zero_lp['accuracy'],
-        'prec_chatgpt_zero_lp': chatgpt_zero_lp['precision'],
-        'rec_chatgpt_zero_lp': chatgpt_zero_lp['recall'],
-        'f1_chatgpt_zero_lp': chatgpt_zero_lp['f1']
     }
 
 

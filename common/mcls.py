@@ -3,7 +3,7 @@ from sklearn.cluster import KMeans
 import pandas as pd
 
 
-def initialize_labels_with_kmeans(X_labeled, X_unlabeled, y_eval: np.ndarray, k=2, r=0.75):
+def initialize_labels_with_kmeans(X_labeled, X_unlabeled, y_eval: np.ndarray, random_state, k=2, r=0.75):
     """
     Label propagation usando KMeans: rotula parte do conjunto não rotulado.
     """
@@ -14,7 +14,7 @@ def initialize_labels_with_kmeans(X_labeled, X_unlabeled, y_eval: np.ndarray, k=
 
     X_all = np.vstack((X_lab, X_unlab))
 
-    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans = KMeans(n_clusters=k, random_state=random_state)
     kmeans.fit(X_all)
     labels_all = kmeans.labels_
 

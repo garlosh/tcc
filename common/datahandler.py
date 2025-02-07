@@ -1,10 +1,10 @@
 import pandas as pd
-from typing import Tuple
 import string
 from gensim.models import Word2Vec
 import numpy as np
 import nltk
 from nltk.corpus import stopwords
+import pdb
 nltk.download('stopwords', quiet=True)
 
 
@@ -40,6 +40,7 @@ def preparar_features_word2vec(df: pd.DataFrame, col_texto: str, col_label: str,
     )
 
     X_emb = []
+    pdb.set_trace()
     for tokens in tokenized:
         valid = [w for w in tokens if w in w2v_model.wv]
         if valid:

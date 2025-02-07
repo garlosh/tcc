@@ -171,3 +171,5 @@ cython_debug/
 .pypirc
 .csv
 teste.*
+dados_gpt/
+diagramas/  

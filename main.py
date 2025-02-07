@@ -9,16 +9,12 @@ from sklearn.metrics import classification_report, accuracy_score
 from xgboost import XGBClassifier
 from dotenv import load_dotenv
 import os
+
 load_dotenv(override=True)
 nltk.download('stopwords', quiet=True)
-# openai.api_key = openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 def treinar_e_avaliar_modelo(modelo, X_train, y_train, X_test, y_test) -> Dict[str, Any]:
-    """
-    Treina o modelo e avalia-o no conjunto de teste, retornando
-    métricas de acurácia, precisão, revocação e F1 (Zhang et al., 2019).
-    """
     modelo.fit(X_train, y_train)
     y_pred = modelo.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
@@ -31,112 +27,129 @@ def treinar_e_avaliar_modelo(modelo, X_train, y_train, X_test, y_test) -> Dict[s
     }
 
 
-def executar_experimento(X_train, y_train_ser, X_test, y_test,
-                         text_train, text_test,
-                         proporcao: float = None, um_rotulo=False) -> Dict[str, Any]:
-    """
-    Remove rótulos e executa:
-      - Cenário sem LP (treina LR, XGB)
-      - Cenário com LP (treina LR, XGB)
-    Retorna um dicionário com as principais métricas de avaliação.
+def executar_experimento(df, proporcao: float = None, seeds: list = None) -> pd.DataFrame:
+    if seeds is None:
+        raise ValueError(
+            "Uma lista de seeds deve ser fornecida para garantir a reprodutibilidade.")
 
-    Adicionalmente, para cada proporção de rótulos removidos, salva os
-    conjuntos de dados de treino e teste em arquivos .csv específicos
-    (Silva e Sato, 2021).    
-    """
-    # 1) Remover rótulos
-    y_mod = datahandler.remover_proporcao_rotulos(y_train_ser, proporcao)
-    prop_info = proporcao
+    metrics_list = []
 
-    # Cria a pasta baseada na proporção de rótulos removidos
-    folder_name = f"./dados_gpt/proporcao_{prop_info}"
-    if not os.path.exists(folder_name):
-        os.makedirs(folder_name)
+    for seed in seeds:
+        np.random.seed(seed)
 
-    # 2) SEM Label Propagation
-    mask_no_lp = (y_mod != -1)
-    X_no_lp = X_train[mask_no_lp]
-    y_no_lp = y_mod[mask_no_lp]
-    text_no_lp = [text_train[i]
-                  for i in range(len(text_train)) if mask_no_lp[i]]
+        # Divisão de treino e teste com seed
+        X, y, _ = datahandler.preparar_features_word2vec(
+            df, 'manchete_limpa', 'label', vector_size=100, window=5, min_count=1)
+        textos = df['manchete_ia'].values
 
-    # Modelos clássicos
-    lr_no_lp = LogisticRegression(max_iter=1000, random_state=42)
-    xgb_no_lp = XGBClassifier(eval_metric='logloss', random_state=42)
+        X_train, X_test, y_train, y_test, text_train, text_test = train_test_split(
+            X, y, textos, test_size=0.2, random_state=seed)
+        y_train_ser = pd.Series(y_train)
 
-    lr_no_lp_res = treinar_e_avaliar_modelo(
-        lr_no_lp, X_no_lp, y_no_lp, X_test, y_test)
-    xgb_no_lp_res = treinar_e_avaliar_modelo(
-        xgb_no_lp, X_no_lp, y_no_lp, X_test, y_test)
+        y_mod = datahandler.remover_proporcao_rotulos(y_train_ser, proporcao)
 
-    # 3) COM Label Propagation (via KMeans)
-    y_propagado = mcls.initialize_labels_with_kmeans(
-        X_no_lp, X_train[~mask_no_lp], y_mod, k=2, r=0.15
-    )
-    mask_lp = (y_propagado != -1)
-    X_lp = X_train[mask_lp]
-    y_lp = y_propagado[mask_lp]
+        # Criar a pasta baseada na proporção de rótulos removidos e seed
+        folder_name = f"./dados_gpt/proporcao_{proporcao}/seed_{seed}"
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
 
-    # Para salvar também os textos usados em LP
-    text_lp = [text_train[i] for i in range(len(text_train)) if mask_lp[i]]
+        # SEM Label Propagation
+        mask_no_lp = (y_mod != -1)
+        X_no_lp = X_train[mask_no_lp]
+        y_no_lp = y_mod[mask_no_lp]
 
-    lr_lp = LogisticRegression(max_iter=1000, random_state=42)
-    xgb_lp = XGBClassifier(eval_metric='logloss', random_state=42)
+        lr_no_lp = LogisticRegression(max_iter=1000, random_state=seed)
+        xgb_no_lp = XGBClassifier(eval_metric='logloss', random_state=seed)
 
-    lr_lp_res = treinar_e_avaliar_modelo(lr_lp, X_lp, y_lp, X_test, y_test)
-    xgb_lp_res = treinar_e_avaliar_modelo(xgb_lp, X_lp, y_lp, X_test, y_test)
+        lr_no_lp_res = treinar_e_avaliar_modelo(
+            lr_no_lp, X_no_lp, y_no_lp, X_test, y_test)
+        xgb_no_lp_res = treinar_e_avaliar_modelo(
+            xgb_no_lp, X_no_lp, y_no_lp, X_test, y_test)
 
-    # ========== SALVAR DADOS EM CSV ==========
+        # COM Label Propagation
+        y_propagado = mcls.initialize_labels_with_kmeans(
+            X_no_lp, X_train[~mask_no_lp], y_mod, k=2, r=0.15, random_state=seed)
+        mask_lp = (y_propagado != -1)
+        X_lp = X_train[mask_lp]
+        y_lp = y_propagado[mask_lp]
 
-    # Cria DataFrame de treinamento SEM LP
-    df_train_no_lp = pd.DataFrame({'text': text_no_lp, 'label': y_no_lp})
-    df_train_no_lp.to_csv(os.path.join(
-        folder_name, 'train_no_lp.csv'), index=False)
+        lr_lp = LogisticRegression(max_iter=1000, random_state=seed)
+        xgb_lp = XGBClassifier(eval_metric='logloss', random_state=seed)
 
-    # Cria DataFrame de teste SEM LP
-    df_test_no_lp = pd.DataFrame({'text': text_test, 'label': y_test})
-    df_test_no_lp.to_csv(os.path.join(
-        folder_name, 'test.csv'), index=False)
+        lr_lp_res = treinar_e_avaliar_modelo(lr_lp, X_lp, y_lp, X_test, y_test)
+        xgb_lp_res = treinar_e_avaliar_modelo(
+            xgb_lp, X_lp, y_lp, X_test, y_test)
 
-    # Cria DataFrame de treinamento COM LP
-    df_train_lp = pd.DataFrame({'text': text_lp, 'label': y_lp})
-    df_train_lp.to_csv(os.path.join(folder_name, 'train_lp.csv'), index=False)
+        # Salvar os dados em CSV
+        df_train_no_lp = pd.DataFrame({'text': [text_train[i] for i in range(
+            len(text_train)) if mask_no_lp[i]], 'label': y_no_lp})
+        df_train_no_lp.to_csv(os.path.join(
+            folder_name, 'train_no_lp.csv'), index=False)
 
-    # 4) Monta dicionário final com as métricas
-    return {
-        'proporcao_remocao': prop_info,
+        df_test_no_lp = pd.DataFrame({'text': text_test})
+        df_test_no_lp.to_csv(os.path.join(
+            folder_name, 'test.csv'), index=False)
 
-        # SEM LP (LR, XGB)
-        'acc_log_no_lp': lr_no_lp_res['accuracy'],
-        'precision_log_no_lp': lr_no_lp_res['precision'],
-        'recall_log_no_lp': lr_no_lp_res['recall'],
-        'f1_log_no_lp': lr_no_lp_res['f1'],
+        df_train_lp = pd.DataFrame({'text': [text_train[i] for i in range(
+            len(text_train)) if mask_lp[i]], 'label': y_lp})
+        df_train_lp.to_csv(os.path.join(
+            folder_name, 'train_lp.csv'), index=False)
 
-        'acc_xgb_no_lp': xgb_no_lp_res['accuracy'],
-        'precision_xgb_no_lp': xgb_no_lp_res['precision'],
-        'recall_xgb_no_lp': xgb_no_lp_res['recall'],
-        'f1_xgb_no_lp': xgb_no_lp_res['f1'],
+        # Adiciona resultados para esta execução
+        metrics_list.append({
+            'proporcao_remocao': proporcao,
+            'seed': seed,
+            'accuracy_log_no_lp': lr_no_lp_res['accuracy'],
+            'precision_log_no_lp': lr_no_lp_res['precision'],
+            'recall_log_no_lp': lr_no_lp_res['recall'],
+            'f1_log_no_lp': lr_no_lp_res['f1'],
 
-        # COM LP (LR, XGB)
-        'acc_log_lp': lr_lp_res['accuracy'],
-        'precision_log_lp': lr_lp_res['precision'],
-        'recall_log_lp': lr_lp_res['recall'],
-        'f1_log_lp': lr_lp_res['f1'],
+            'accuracy_xgb_no_lp': xgb_no_lp_res['accuracy'],
+            'precision_xgb_no_lp': xgb_no_lp_res['precision'],
+            'recall_xgb_no_lp': xgb_no_lp_res['recall'],
+            'f1_xgb_no_lp': xgb_no_lp_res['f1'],
 
-        'acc_xgb_lp': xgb_lp_res['accuracy'],
-        'precision_xgb_lp': xgb_lp_res['precision'],
-        'recall_xgb_lp': xgb_lp_res['recall'],
-        'f1_xgb_lp': xgb_lp_res['f1'],
-    }
+            'accuracy_log_lp': lr_lp_res['accuracy'],
+            'precision_log_lp': lr_lp_res['precision'],
+            'recall_log_lp': lr_lp_res['recall'],
+            'f1_log_lp': lr_lp_res['f1'],
+
+            'accuracy_xgb_lp': xgb_lp_res['accuracy'],
+            'precision_xgb_lp': xgb_lp_res['precision'],
+            'recall_xgb_lp': xgb_lp_res['recall'],
+            'f1_xgb_lp': xgb_lp_res['f1'],
+        })
+
+    # Converte os resultados em DataFrame
+    metrics_df = pd.DataFrame(metrics_list)
+
+    # Retorna DataFrame com médias e desvios padrão separados por métrica
+    summary = metrics_df.groupby('proporcao_remocao').agg({
+        'accuracy_log_no_lp': ['mean', 'std'],
+        'precision_log_no_lp': ['mean', 'std'],
+        'recall_log_no_lp': ['mean', 'std'],
+        'f1_log_no_lp': ['mean', 'std'],
+        'accuracy_xgb_no_lp': ['mean', 'std'],
+        'precision_xgb_no_lp': ['mean', 'std'],
+        'recall_xgb_no_lp': ['mean', 'std'],
+        'f1_xgb_no_lp': ['mean', 'std'],
+        'accuracy_log_lp': ['mean', 'std'],
+        'precision_log_lp': ['mean', 'std'],
+        'recall_log_lp': ['mean', 'std'],
+        'f1_log_lp': ['mean', 'std'],
+        'accuracy_xgb_lp': ['mean', 'std'],
+        'precision_xgb_lp': ['mean', 'std'],
+        'recall_xgb_lp': ['mean', 'std'],
+        'f1_xgb_lp': ['mean', 'std']
+    }).reset_index()
+
+    summary.columns = ['_'.join(col).strip('_')
+                       for col in summary.columns.values]
+
+    return summary
 
 
 def main():
-    """
-    Função principal que carrega os dados, realiza pré-processamento,
-    gera embeddings e executa a rotina de experimentos para diferentes
-    proporções de rótulos removidos (Zhang et al., 2019).
-    """
-    # Carregamento e pré-processamento
     caminho_dados = './dados/pre-processed.csv'
     caminho_arquivo = 'resultados_tcc.csv'
     df = datahandler.carregar_dados(caminho_dados)
@@ -144,49 +157,19 @@ def main():
     df['manchete_limpa'] = df['preprocessed_news'].apply(
         datahandler.limpar_texto)
 
-    # Gera embeddings
-    X, y, _ = datahandler.preparar_features_word2vec(df, 'manchete_limpa', 'label',
-                                                     vector_size=100, window=5, min_count=1)
-    textos = df['manchete_ia'].values
-
-    # Divide treino/teste
-    X_train, X_test, y_train, y_test, text_train, text_test = train_test_split(
-        X, y, textos, test_size=0.2, random_state=2025
-    )
-
-    # Convertendo y_train para Series (facilita indexar e remover rótulos)
-    y_train_ser = pd.Series(y_train)
-
-    # Lista de proporções de rótulos que serão removidos
-    proporcoes = [0.0, 0.50, 0.75]  # Exemplo
-
-    # Executa experimentos
+    proporcoes = [0.0, 0.50, 0.75]
+    seeds = [42, 43, 44, 45, 46]  # Lista de seeds para reprodutibilidade
     resultados = []
 
     for prop in proporcoes:
-        # Executa o experimento, salvando resultados e arquivos de dados .csv
-        res_dict = executar_experimento(
-            X_train, y_train_ser, X_test, y_test,
-            text_train, text_test,
-            proporcao=prop
-        )
+        df_resultados = executar_experimento(df, proporcao=prop, seeds=seeds)
+        resultados.append(df_resultados)
 
-        resultados.append(res_dict)
-        df_resultados = pd.DataFrame(resultados)
+    # Combina todos os resultados em um único DataFrame e salva
+    final_resultados = pd.concat(resultados, ignore_index=True)
+    final_resultados.to_csv(caminho_arquivo, index=False)
 
-        file_exists = os.path.isfile(caminho_arquivo)
-        df_resultados.to_csv(
-            caminho_arquivo,
-            mode='a',
-            index=False,
-            header=not file_exists  # Adiciona o cabeçalho somente se o arquivo não existir
-        )
-
-        # Limpa a lista de resultados para evitar duplicações no CSV final
-        resultados.clear()
-
-        print(f"Resultados intermediários com proporção {
-              prop} salvos em '{caminho_arquivo}'.")
+    print(f"Resultados salvos em '{caminho_arquivo}'.")
 
 
 if __name__ == '__main__':

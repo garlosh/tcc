@@ -14,8 +14,9 @@ data['unique_word_count'] = data['preprocessed_news'].apply(
     lambda x: len(set(str(x).split())))  # Palavras únicas
 
 # Resumo estatístico das novas colunas
-summary_stats = data[['character_count',
-                      'word_count', 'unique_word_count']].describe()
+summary_stats = data[['character_count', 'word_count', 'unique_word_count']].agg([
+    'count', 'mean', 'std', 'min', 'max'
+])
 
 # Gráfico de distribuição do número de palavras
 plt.figure(figsize=(10, 6))
